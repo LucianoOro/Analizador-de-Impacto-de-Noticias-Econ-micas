@@ -1,0 +1,6 @@
+streamlit
+pandas
+altair
+scikit-learn==1.6.1
+joblib
+pyarrow
