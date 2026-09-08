@@ -6,3 +6,5 @@ __pycache__/
 Ciencia de Datos/
 artifacts/
 .ipynb_checkpoints/
+# Copia local del dataset fuente para que los notebooks corran sin descargar
+notebooks/correlacion_final_2025-09-24.csv

@@ -1,0 +1,13 @@
+# Dependencias para ejecutar los notebooks de notebooks/.
+# Son distintas de requirements.txt, que cubre solo la app Streamlit:
+# el EDA y el modelado usan matplotlib, seaborn y scipy, que la app no necesita.
+#
+#   pip install -r requirements.txt -r requirements-notebooks.txt
+#
+# En Google Colab estas librerias vienen preinstaladas en la imagen; en un
+# entorno local hay que declararlas.
+matplotlib==3.11.1
+seaborn==0.13.2
+scipy==1.18.1
+gdown==6.2.0
+ipykernel==7.3.0
