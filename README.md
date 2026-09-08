@@ -29,7 +29,7 @@ El proyecto sigue un ciclo de vida completo de Ciencia de Datos (End-to-End):
 
 | Etapa | Tecnología | Descripción |
 | :--- | :--- | :--- |
-| **1. Ingeniería de Datos** | `Apache Airflow`, `Pandas` | Pipeline ETL automatizado para ingesta, limpieza y alineación temporal de fuentes heterogéneas. |
+| **1. Ingeniería de Datos** | `Apache Airflow`, `Pandas` | En la Entrega 1 se diseñó un pipeline ETL con Airflow para la ingesta, limpieza y alineación temporal de fuentes heterogéneas. El código del DAG no forma parte de este repositorio; aquí se conserva el dataset fuente ya consolidado (`data/correlacion_final_2025-09-24.csv`) que ese pipeline produjo. |
 | **2. EDA & Insights** | `Matplotlib`, `Seaborn` | Análisis estadístico, detección de no-linealidad y correlaciones inter-mercado. |
 | **3. Machine Learning** | `Scikit-learn` | Modelado predictivo, validación cruzada, detección de *Data Leakage* y ajuste de hiperparámetros. |
 | **4. Despliegue** | `Streamlit`, `Altair` | Aplicación web interactiva con simulador en tiempo real y backtesting. |
@@ -45,8 +45,8 @@ El mayor desafío fue la **heterogeneidad de datos** (comparar Inflación en `%`
 
 ### 2. Análisis Exploratorio (EDA) - El "Cuarteto de Anscombe"
 Descubrimos que la relación entre la noticia y el precio **no es lineal**.
-* **Hallazgo:** El mercado ignora las sorpresas pequeñas (ruido). La señal direccional solo emerge en los **eventos extremos** (> 2 Desvíos Estándar).
-* **Acción:** Filtramos el dataset para entrenar los modelos únicamente con los eventos de "Cola" (Extremos), eliminando el 50% de ruido central.
+* **Hallazgo:** El mercado ignora las sorpresas pequeñas (ruido). La señal direccional solo emerge en los **eventos extremos**, definidos como el **cuartil superior e inferior** de `sorpresa_std` (`pd.qcut(q=4)`, aproximadamente ±0.67 desvíos estándar), no como un umbral fijo de 2 desvíos estándar.
+* **Acción:** Filtramos el dataset para entrenar los modelos únicamente con los eventos de "Cola" (cuartiles Extremos: "Negativa Extrema" y "Positiva Extrema"), eliminando el 50% de ruido central (los cuartiles "Moderados").
 
 ### 3. Modelado: El Desafío del Data Leakage
 Durante la fase de desarrollo, detectamos una **fuga de datos (data leakage)** crítica: el uso de características de la vela (mechas) que no están disponibles al momento de la predicción.
@@ -89,17 +89,45 @@ Si deseas correr este proyecto en tu máquina local:
    ```bash
    streamlit run app.py
 
-## 📂 Estructura del Repositorio
-├── app.py                        # Aplicación principal (Streamlit Dashboard)
-├── requirements.txt              # Dependencias exactas (Python 3.11 + Sklearn 1.2.2)
+## 📂 Estructura del Proyecto
+
+```
+.
+├── app.py                              # Aplicación principal (Streamlit Dashboard)
+├── requirements.txt                    # Dependencias exactas (Python 3.11 + Sklearn 1.2.2)
 ├── dataset_completo_procesado.parquet  # Dataset final con Z-Scores y Retornos (Output del ETL)
-├── feature_info.pkl              # Metadatos de las columnas de entrenamiento
-├── preprocessor.joblib           # Pipeline de preprocesamiento (Escalado + Encoding)
-├── model_indices.joblib          # Modelo entrenado para S&P 500
-├── model_cripto.joblib           # Modelo entrenado para Bitcoin
-├── model_forex.joblib            # Modelo entrenado para EURUSD
-├── model_commodities.joblib      # Modelo entrenado para Oro
-└── README.md                     # Documentación del proyecto
+├── dataset_para_modelado.parquet       # Dataset filtrado a eventos extremos (usado en el entrenamiento)
+├── feature_info.pkl                    # Metadatos de las columnas de entrenamiento
+├── preprocessor.joblib                 # Pipeline de preprocesamiento desplegado (Escalado + Encoding)
+├── model_indices.joblib                # Modelo desplegado para S&P 500
+├── model_cripto.joblib                 # Modelo desplegado para Bitcoin
+├── model_forex.joblib                  # Modelo desplegado para EURUSD
+├── model_commodities.joblib            # Modelo desplegado para Oro
+│
+├── src/                                # Código fuente reutilizable
+│   ├── features.py                     # Ingeniería de características (extraída del notebook final)
+│   └── train.py                        # Script para reproducir el pipeline de entrenamiento
+│
+├── notebooks/                          # Proceso de Ciencia de Datos (ver notebooks/README.md)
+│   ├── 01_eda.ipynb                    # Análisis Exploratorio de Datos (Entrega 2)
+│   ├── 02_modelado_con_fuga.ipynb      # Modelado con data leakage (evidencia del hallazgo)
+│   └── 03_modelado_final.ipynb         # Notebook autoritativo (sin fuga) que generó los artefactos desplegados
+│
+├── docs/                               # Informe y notas del proyecto
+│   ├── Informe.docx
+│   └── Notas del Proyecto.docx
+│
+├── data/                               # Dataset fuente (previo al procesamiento)
+│   ├── correlacion_final_2025-09-24.csv
+│   └── correlacion_final_2025-09-24.xlsx
+│
+└── README.md                           # Documentación del proyecto
+```
+
+> Los artefactos desplegados (`.joblib`, `.parquet`, `.pkl`) permanecen en la
+> raíz del repositorio: son los que consume `app.py` en producción. El script
+> `src/train.py` reproduce el pipeline que los generó, pero escribe sus
+> resultados en `artifacts/` (ignorado por git) para no sobreescribirlos.
 
 ## 📞 Contacto
 Este proyecto fue realizado como trabajo final integrador para la carrera de Ciencia de Datos. Si tienes dudas sobre la metodología, el código o los hallazgos sobre la no-linealidad de los mercados, no dudes en contactarme.
