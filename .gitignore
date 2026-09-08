@@ -1,3 +1,8 @@
 venv/
 __pycache__/
 *.DS_Store
+.claude/
+.atl/
+Ciencia de Datos/
+artifacts/
+.ipynb_checkpoints/
