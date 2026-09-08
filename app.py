@@ -306,19 +306,82 @@ with tab1:
     # --- SECCIÓN 3: DICCIONARIO DE NOTICIAS ---
     st.subheader("📰 Guía de Eventos Macroeconómicos")
     
+    # El contenido editorial vive acá, indexado por el nombre limpio que produce
+    # `cargar_datos` en la columna 'noticia_clean'. La tabla NO se escribe a mano:
+    # se arma cruzando este diccionario contra las noticias realmente presentes en
+    # el dataset. Así no puede volver a listar un evento que no existe (antes
+    # figuraba FOMC, que nunca estuvo en los datos) ni omitir uno que sí está
+    # (faltaba Core Retail Sales).
+    GLOSARIO_NOTICIAS = {
+        "Nfp": ("Non-Farm Payrolls",
+                "Empleo creado en EE.UU., excluyendo el sector agrícola.",
+                "Muy alto. Es el dato rey: define la lectura de salud de la economía."),
+        "Cpi": ("Consumer Price Index",
+                "Inflación que pagan los consumidores.",
+                "Alto. Determina si la Fed sube o baja tasas."),
+        "Ppi": ("Producer Price Index",
+                "Inflación mayorista, del lado de los costos.",
+                "Medio. Adelanta lo que después aparece en el CPI."),
+        "Gdq": ("Gross Domestic Product (GDP)",
+                "Crecimiento total de la economía.",
+                "Medio. Dato retrasado, pero confirma recesión o expansión."),
+        "Unemployment Rate": ("Tasa de Desempleo",
+                              "Porcentaje de la población activa sin trabajo.",
+                              "Alto. Es parte del mandato dual de la Fed."),
+        "Average Hourly Earnings": ("Average Hourly Earnings",
+                                    "Inflación de salarios, es decir el costo laboral.",
+                                    "Alto. Si los sueldos suben, la inflación cuesta más de bajar."),
+        "Pmi": ("Purchasing Managers' Index",
+                "Encuesta a gerentes de compras sobre actividad esperada.",
+                "Medio. Es el mejor indicador adelantado de recesión."),
+        "Core Retail Sales": ("Core Retail Sales",
+                              "Ventas minoristas excluyendo automotores.",
+                              "Medio. Mide el consumo, principal motor del PBI de EE.UU."),
+    }
+
     with st.expander("Ver Diccionario de Noticias Detallado", expanded=True):
-        st.markdown("""
-        | Noticia (Evento) | Nombre Completo | ¿Qué mide? | Impacto Típico |
-        | :--- | :--- | :--- | :--- |
-        | NFP | Non-Farm Payrolls | Empleo creado en EE.UU. (excl. agro). | Muy Alto. Es el dato rey. Define la salud de la economía. |
-        | CPI | Consumer Price Index | Inflación que pagan los consumidores. | Alto. Determina si la Fed sube o baja tasas. |
-        | PPI | Producer Price Index | Inflación mayorista (costos). | Medio. Adelanta lo que pasará con el CPI. |
-        | GDP | Gross Domestic Product | Crecimiento total de la economía. | Medio. Dato "retrasado", pero confirma recesión/expansión. |
-        | Unemployment | Tasa de Desempleo | Porcentaje de gente sin trabajo. | Alto. Parte del mandato dual de la Fed. |
-        | Avg Hourly Earnings| Average Hourly Earnings | Inflación de salarios (costo laboral). | **Alto. Si los sueldos suben, la inflación es difícil de bajar. |
-        | PMI | Purchasing Managers' Index | Encuesta a gerentes de compras. | Medio. El mejor indicador adelantado de recesión. |
-        | FOMC | Federal Funds Rate | Decisión de tipos de interés. | Extremo. El costo del dinero. Mueve todo. |
-        """)
+        if df_completo.empty or 'noticia_clean' not in df_completo.columns:
+            st.info("No hay datos cargados para construir el diccionario de noticias.")
+        else:
+            noticias_presentes = sorted(df_completo['noticia_clean'].dropna().unique())
+            conteo = df_completo['noticia_clean'].value_counts()
+
+            filas_glosario = []
+            sin_descripcion = []
+            for noticia in noticias_presentes:
+                if noticia in GLOSARIO_NOTICIAS:
+                    nombre, mide, impacto = GLOSARIO_NOTICIAS[noticia]
+                else:
+                    nombre, mide, impacto = ("—", "—", "Sin descripción cargada.")
+                    sin_descripcion.append(noticia)
+                filas_glosario.append({
+                    "Evento": noticia,
+                    "Nombre completo": nombre,
+                    "¿Qué mide?": mide,
+                    "Impacto típico": impacto,
+                    "Publicaciones en el dataset": int(conteo.get(noticia, 0)),
+                })
+
+            st.dataframe(
+                pd.DataFrame(filas_glosario),
+                hide_index=True,
+                use_container_width=True
+            )
+
+            if sin_descripcion:
+                st.warning(
+                    "Estas noticias están en los datos pero no tienen descripción "
+                    f"cargada en el glosario: {', '.join(sin_descripcion)}."
+                )
+
+            if "Gdq" in noticias_presentes:
+                st.caption(
+                    "Sobre el nombre 'Gdq': el archivo de origen se llama `gdq.xlsx`, "
+                    "un error de tipeo por `gdp.xlsx` que quedó propagado en el "
+                    "pipeline. Se conserva tal cual porque es una de las categorías "
+                    "con las que los modelos fueron entrenados: renombrarla sin "
+                    "reentrenar rompería la correspondencia con el `OneHotEncoder`."
+                )
         
     st.info("👈 Instrucciones: Utilice el menú lateral para simular una noticia en tiempo real y ver la predicción de nuestros modelos.")
 
@@ -863,7 +926,13 @@ with tab5:
     with col_b2:
         # --- MODIFICADO: Uso de listas limpias para el filtro ---
         available_news_clean = sorted(df_completo['noticia_clean'].unique())
-        default_news_clean = [n for n in ['Nfp', 'Cpi', 'Fomc'] if n in available_news_clean]
+        # Las tres noticias de mayor impacto que SÍ existen en el dataset. El
+        # default anterior incluía 'Fomc', que no es una categoría de los datos:
+        # el filtro `if n in available_news_clean` lo descartaba en silencio y el
+        # backtest arrancaba con dos noticias mientras la interfaz sugería tres.
+        default_news_clean = [
+            n for n in ['Nfp', 'Cpi', 'Unemployment Rate'] if n in available_news_clean
+        ]
         sim_news_clean = st.multiselect("2. Noticias a Operar:", options=available_news_clean, default=default_news_clean)
     
     with col_b3:
