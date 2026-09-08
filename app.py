@@ -6,6 +6,8 @@ import pickle
 import numpy as np
 import os
 
+from src.features import parse_numeric_value, obtener_umbrales_cuartiles, clasificar_magnitud
+
 # ----------------------------------------------------------------------
 # 1. CONFIGURACIÓN INICIAL
 # ----------------------------------------------------------------------
@@ -19,11 +21,6 @@ st.set_page_config(
 # ----------------------------------------------------------------------
 # 2. FUNCIONES DE CARGA
 # ----------------------------------------------------------------------
-def parse_numeric_value(value):
-    if isinstance(value, str):
-        value = value.strip().replace('%', '').replace('K', 'e3').replace('M', 'e6').replace('B', 'e9')
-    return pd.to_numeric(value, errors='coerce')
-
 @st.cache_resource
 def cargar_modelo(path):
     try: return joblib.load(path)
@@ -75,6 +72,14 @@ models = {
 }
 df_completo = cargar_datos(PATH_DATA)
 stats_dict = get_stats_dict(df_completo)
+
+# --- Umbrales de cuartiles (mismos criterios usados en el entrenamiento) ---
+if not df_completo.empty:
+    Q1_SORPRESA, Q3_SORPRESA = obtener_umbrales_cuartiles(df_completo)
+else:
+    # Respaldo con los cortes empíricos medidos sobre el dataset completo.
+    # No se usan sigmas fijos: 'sorpresa_std' tiene curtosis ~62, muy lejos de una normal.
+    Q1_SORPRESA, Q3_SORPRESA = -0.262, 0.272
 
 # --- AGREGADO: MAPEO DE NOTICIAS (Limpio -> Sucio) ---
 news_map = {}
@@ -140,11 +145,9 @@ else:
     st.sidebar.info(f"Sorpresa: {z_score:.2f} Std Dev")
 
 if st.sidebar.button("🔮 Predecir Dirección", type="primary"):
-    val_magnitud = "Moderada"
-    if z_score > 1.0: val_magnitud = "Positiva Extrema"
-    elif z_score < -1.0: val_magnitud = "Negativa Extrema"
-    
-    if val_magnitud == "Moderada":
+    val_magnitud = clasificar_magnitud(z_score, Q1_SORPRESA, Q3_SORPRESA)
+
+    if val_magnitud not in ("Positiva Extrema", "Negativa Extrema"):
         st.sidebar.warning("⚠ Sorpresa moderada. Modelos menos fiables.")
 
     if numeric_features:
